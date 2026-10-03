@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Blueprint Market Analyzer</title>
+<style>
+:root{--bg:#06163d;--panel:#0b255f;--panel2:#0e2d70;--line:#1f4eaa;--text:#eef5ff;--muted:#9db4dd;--cyan:#20e0ef;--green:#21d39a;--red:#ff647c;--yellow:#ffd45c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#06143a,#08235d 55%,#06183f);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:12px 12px 28px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.brand{font-weight:800;letter-spacing:.4px}.brand small{display:block;color:#6ee9ff;font-size:10px;letter-spacing:1.2px}.status{font-size:11px;padding:6px 9px;border:1px solid #2861bf;border-radius:999px;color:var(--muted)}.status.on{color:#7ff6c5;border-color:#168e73}
+.card{background:linear-gradient(180deg,rgba(17,53,125,.95),rgba(8,31,78,.98));border:1px solid #2353a2;border-radius:16px;padding:12px;margin:10px 0;box-shadow:0 8px 25px rgba(0,0,0,.18)}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}label{font-size:10px;color:var(--muted);display:block;margin-bottom:5px}.select,button{width:100%;border:1px solid #3670d0;background:#092258;color:#fff;border-radius:11px;padding:11px;font-weight:700}.select{appearance:auto}button{cursor:pointer}button.primary{background:linear-gradient(90deg,#0ed4e8,#29aeea);color:#02163d;border:0}button.secondary{background:#0a2b69}.tiny{font-size:10px;color:var(--muted)}
+.hero{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.symbol{font-weight:800;font-size:18px}.price{font-size:28px;font-weight:900}.change{font-size:12px}.bull{color:var(--green)}.bear{color:var(--red)}.neutral{color:var(--yellow)}
+canvas{width:100%;height:220px;background:#061b45;border-radius:12px;border:1px solid #1a448f;display:block}
+.signal{border-radius:14px;padding:13px;text-align:center;border:1px solid #2b63bd;background:#071d49}.signal .big{font-size:27px;font-weight:900;letter-spacing:1px}.signal.buy{border-color:#159c7b}.signal.sell{border-color:#b63b55}.signal.wait{border-color:#b68a25}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric{background:#08235a;border:1px solid #1a438c;border-radius:11px;padding:10px}.metric b{display:block;font-size:15px;margin-top:3px}.metric span{font-size:10px;color:var(--muted)}
+.scorebar{height:8px;border-radius:99px;background:#071735;overflow:hidden}.scorefill{height:100%;width:0;background:linear-gradient(90deg,#ffd45c,#20e0ef);transition:.3s}
+.table{width:100%;border-collapse:collapse;font-size:11px}.table td{padding:7px 2px;border-bottom:1px solid #174184}.table td:last-child{text-align:right;font-weight:800}
+.footer{font-size:9px;color:#7f99c5;text-align:center;margin-top:14px;line-height:1.5}.danger{color:#ffb4bf}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">BLUEPRINT <small>MARKET ANALYZER PRO</small></div>
+    <div id="conn" class="status">Connecting…</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="grow"><label>VOLATILITY INDEX</label>
+        <select id="symbol" class="select">
+          <option value="1HZ25V">Volatility 25 (1s)</option>
+          <option value="1HZ10V">Volatility 10 (1s)</option>
+          <option value="1HZ50V">Volatility 50 (1s)</option>
+          <option value="1HZ75V">Volatility 75 (1s)</option>
+          <option value="1HZ100V">Volatility 100 (1s)</option>
+          <option value="R_25">Volatility 25</option>
+          <option value="R_50">Volatility 50</option>
+          <option value="R_75">Volatility 75</option>
+          <option value="R_100">Volatility 100</option>
+        </select>
+      </div>
+      <div style="width:110px"><label>TIMEFRAME</label>
+        <select id="tf" class="select"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="900">15 minutes</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hero">
+    <div><div id="name" class="symbol">Volatility 25 (1s)</div><div class="tiny">Live market price</div></div>
+    <div style="text-align:right"><div id="price" class="price">—</div><div id="chg" class="change neutral">Waiting for data</div></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Volatility · Candlestick Chart</b><span id="trendText" class="tiny">—</span></div>
+    <canvas id="chart" width="1000" height="440"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="analyze" class="primary">GENERATE ANALYSIS</button>
+      <button id="scan" class="secondary">SCANNER</button>
+    </div>
+    <div style="margin-top:10px" class="signal wait" id="signal">
+      <div class="tiny">CURRENT ANALYSIS</div><div class="big">WAITING</div><div id="signalReason" class="tiny">Collecting live ticks…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>ANALYSIS SCORE</label>
+    <div class="row"><div class="scorebar grow"><div id="scorefill" class="scorefill"></div></div><b id="score">0/10</b></div>
+    <div class="grid" style="margin-top:9px">
+      <div class="metric"><span>Trend</span><b id="trend">—</b></div>
+      <div class="metric"><span>Momentum</span><b id="momentum">—</b></div>
+      <div class="metric"><span>RSI</span><b id="rsi">—</b></div>
+      <div class="metric"><span>ADX</span><b id="adx">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>STRATEGY MATCHES</label>
+    <table class="table">
+      <tr><td>EMA trend (9 / 21 / 50)</td><td id="m1">—</td></tr>
+      <tr><td>RSI momentum</td><td id="m2">—</td></tr>
+      <tr><td>MACD direction</td><td id="m3">—</td></tr>
+      <tr><td>ADX trend strength</td><td id="m4">—</td></tr>
+      <tr><td>Breakout / structure</td><td id="m5">—</td></tr>
+      <tr><td>Volatility filter</td><td id="m6">—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="metric"><span>Support</span><b id="support">—</b></div>
+      <div class="metric"><span>Resistance</span><b id="resistance">—</b></div>
+      <div class="metric"><span>ATR</span><b id="atr">—</b></div>
+      <div class="metric"><span>Last update</span><b id="updated">—</b></div>
+    </div>
+  </div>
+
+  <div class="card" style="display:flex;gap:8px">
+    <button id="notify" class="secondary">ENABLE ALERTS</button>
+    <button id="clear" class="secondary">RESET</button>
+  </div>
+
+  <div class="footer">If connection fails, the analyzer automatically tries Deriv's public market-data endpoints. Keep the page open in Chrome with an active internet connection.<br><br>For analysis/education only. Signals are rule-based and are not guaranteed to be profitable. This version reads public Deriv market data; it does not place trades.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const names={1HZ25V:"Volatility 25 (1s)",1HZ10V:"Volatility 10 (1s)",1HZ50V:"Volatility 50 (1s)",1HZ75V:"Volatility 75 (1s)",1HZ100V:"Volatility 100 (1s)",R_25:"Volatility 25",R_50:"Volatility 50",R_75:"Volatility 75",R_100:"Volatility 100"};
+let ws=null, ticks=[], candles=[], lastPrice=null, lastSignal="WAIT", alertReady=false, timer=null, connectionTimer=null;
+const ENDPOINT="wss://ws.binaryws.com/websockets/v3";
+
+function connect(){
+  if(ws) try{ws.close()}catch(e){}
+  if(connectionTimer) clearTimeout(connectionTimer);
+  $("conn").textContent="Connecting…"; $("conn").className="status";
+  ws=new WebSocket(ENDPOINT);
+  connectionTimer=setTimeout(()=>{
+    if(ws && ws.readyState!==WebSocket.OPEN){
+      $("conn").textContent="Connection blocked"; $("conn").className="status";
+      $("signalReason").textContent="The browser did not open Deriv's WebSocket. The separate connection test works, so refresh this page once.";
+      try{ws.close()}catch(e){}
+    }
+  },7000);
+  ws.onopen=()=>{
+    clearTimeout(connectionTimer);
+    $("conn").textContent="LIVE"; $("conn").className="status on";
+    requestHistory();
+  };
+  ws.onmessage=e=>{
+    let d; try{d=JSON.parse(e.data)}catch(_){return}
+    if(d.error){
+      $("conn").textContent="API error"; $("conn").className="status";
+      $("signalReason").textContent=(d.error.message||d.error.code||"Deriv API error");
+      return;
+    }
+    if(d.msg_type==="history" && d.history?.prices){
+      ticks=d.history.prices.map((p,i)=>({p:Number(p),t:Number(d.history.times[i])}));
+      buildCandles();
+      ws.send(JSON.stringify({ticks:$('symbol').value,subscribe:1,req_id:12}));
+      render(); analyze();
+    }
+    if(d.msg_type==="tick" && d.tick){
+      const t={p:Number(d.tick.quote),t:Number(d.tick.epoch)};
+      lastPrice=t.p; ticks.push(t); if(ticks.length>3000)ticks.shift();
+      buildCandles(); render(); analyze();
+    }
+  };
+  ws.onerror=()=>{};
+  ws.onclose=()=>{ if($("conn").textContent==="LIVE") $("conn").textContent="Disconnected"; };
+}
+
+function requestHistory(){
+  const symbol=$("symbol").value;
+  ws.send(JSON.stringify({ticks_history:symbol,end:"latest",count:1200,style:"ticks",subscribe:0,req_id:11}));
+}
+
+// Symbol selection is sent directly to Deriv after connection.
+
+function buildCandles(){
+  const sec=Number($("tf").value), map=new Map();
+  for(const x of ticks){const bucket=Math.floor(x.t/sec)*sec;if(!map.has(bucket))map.set(bucket,{t:bucket,o:x.p,h:x.p,l:x.p,c:x.p});let c=map.get(bucket);c.h=Math.max(c.h,x.p);c.l=Math.min(c.l,x.p);c.c=x.p}
+  candles=[...map.values()].slice(-120);
+}
+function ema(a,n){if(a.length<n)return null;let k=2/(n+1),v=a.slice(0,n).reduce((x,y)=>x+y,0)/n;for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);return v}
+function rsi(a,n=14){if(a.length<=n)return null;let g=0,l=0;for(let i=1;i<=n;i++){let d=a[i]-a[i-1];if(d>=0)g+=d;else l-=d}let ag=g/n,al=l/n;for(let i=n+1;i<a.length;i++){let d=a[i]-a[i-1];ag=(ag*(n-1)+Math.max(d,0))/n;al=(al*(n-1)+Math.max(-d,0))/n}return al===0?100:100-100/(1+ag/al)}
+function atr(cs,n=14){if(cs.length<=n)return null;let tr=[];for(let i=1;i<cs.length;i++)tr.push(Math.max(cs[i].h-cs[i].l,Math.abs(cs[i].h-cs[i-1].c),Math.abs(cs[i].l-cs[i-1].c)));return tr.slice(-n).reduce((a,b)=>a+b,0)/n}
+function macd(a){if(a.length<35)return null;let fast=ema(a,12),slow=ema(a,26);let line=fast-slow;let arr=[];for(let i=26;i<a.length;i++)arr.push(ema(a.slice(0,i+1),12)-ema(a.slice(0,i+1),26));let sig=ema(arr,9);return {line,sig,hist:line-(sig??line)}}
+function adx(cs,n=14){if(cs.length<2*n+2)return null;let trs=[],pdm=[],mdm=[];for(let i=1;i<cs.length;i++){let up=cs[i].h-cs[i-1].h,down=cs[i-1].l-cs[i].l;trs.push(Math.max(cs[i].h-cs[i].l,Math.abs(cs[i].h-cs[i-1].c),Math.abs(cs[i].l-cs[i-1].c)));pdm.push(up>down&&up>0?up:0);mdm.push(down>up&&down>0?down:0)}let tr=trs.slice(-n).reduce((a,b)=>a+b,0),p=pdm.slice(-n).reduce((a,b)=>a+b,0),m=mdm.slice(-n).reduce((a,b)=>a+b,0);let pi=tr?100*p/tr:0,mi=tr?100*m/tr:0;return (pi+mi)?100*Math.abs(pi-mi)/(pi+mi):0}
+function analysis(){
+  if(candles.length<55)return null;
+  const a=candles.map(x=>x.c), e9=ema(a,9),e21=ema(a,21),e50=ema(a,50),R=rsi(a),A=atr(candles),M=macd(a),D=adx(candles),p=a.at(-1), highs=candles.slice(-20).map(x=>x.h), lows=candles.slice(-20).map(x=>x.l),res=Math.max(...highs),sup=Math.min(...lows);
+  let bull=0,bear=0;
+  const add=(b,s=1)=>b?bull+=s:bear+=s;
+  add(e9>e21&&e21>e50,2); add(e9<e21&&e21<e50,2);
+  add(R>55,1); add(R<45,1);
+  add(M?.hist>0,1); add(M?.hist<0,1);
+  add(D>=20&&e9>e21,1); add(D>=20&&e9<e21,1);
+  add(p>res-A*.15,1); add(p<sup+A*.15,1);
+  const total=Math.max(bull,bear), signal=total>=7?(bull>bear?"BUY":"SELL"):"WAIT";
+  return {p,e9,e21,e50,R,A,M,D,res,sup,bull,bear,total,signal};
+}
+function fmt(x){return x==null?"—":Number(x).toFixed(2)}
+function setMatch(id,v){$(id).textContent=v?"MATCH":"NO";$(id).className=v?"bull":"bear"}
+function analyze(){
+  const x=analysis(); if(!x)return;
+  $("price").textContent=fmt(x.p); $("rsi").textContent=fmt(x.R); $("adx").textContent=fmt(x.D); $("atr").textContent=fmt(x.A);
+  $("support").textContent=fmt(x.sup); $("resistance").textContent=fmt(x.res); $("updated").textContent=new Date().toLocaleTimeString();
+  const tr=x.e9>x.e21&&x.e21>x.e50?"BULLISH":x.e9<x.e21&&x.e21<x.e50?"BEARISH":"MIXED";
+  $("trend").textContent=tr;$("trendText").textContent=tr;
+  const mom=x.R>=55&&x.M?.hist>0?"BULLISH":x.R<=45&&x.M?.hist<0?"BEARISH":"MIXED";$("momentum").textContent=mom;
+  $("m1").textContent=(tr==="BULLISH"||tr==="BEARISH")?"MATCH":"MIXED";
+  setMatch("m2",x.R>=55||x.R<=45); setMatch("m3",!!(x.M&&(x.M.hist>0||x.M.hist<0))); setMatch("m4",x.D>=20);
+  setMatch("m5",x.p>x.res-x.A*.15||x.p<x.sup+x.A*.15); setMatch("m6",x.A>0);
+  $("score").textContent=x.total+"/10";$("scorefill").style.width=(x.total*10)+"%";
+  $("signal").className="signal "+(x.signal==="BUY"?"buy":x.signal==="SELL"?"sell":"wait");
+  $("signal").querySelector(".big").textContent=x.signal;
+  $("signalReason").textContent=x.signal==="WAIT"?"Conditions are mixed — wait for confirmation.":`Rule match: ${x.total}/10 · Trend ${tr.toLowerCase()} · Momentum ${mom.toLowerCase()}`;
+  $("chg").textContent=lastPrice==null?"Live":(lastPrice>x.p? "↑ live":"↓ live");
+  $("chg").className="change "+(lastPrice==null?"neutral":lastPrice>x.p?"bull":"bear");
+  if(x.signal!==lastSignal && x.signal!=="WAIT" && alertReady){ if(navigator.vibrate)navigator.vibrate([200,100,200]); if(Notification.permission==="granted")new Notification("Blueprint signal",{body:names[$("symbol").value]+": "+x.signal+" ("+x.total+"/10)"});}
+  lastSignal=x.signal;
+}
+function render(){
+  const c=$("chart"),ctx=c.getContext("2d"),W=c.width,H=c.height;ctx.clearRect(0,0,W,H);
+  const cs=candles.slice(-55);if(cs.length<2)return;let min=Math.min(...cs.map(x=>x.l)),max=Math.max(...cs.map(x=>x.h)),pad=(max-min)*.08||1;min-=pad;max+=pad;
+  const X=i=>i*(W-24)/(cs.length-1)+12,Y=p=>H-18-(p-min)*(H-36)/(max-min);
+  ctx.strokeStyle="#123b78";ctx.lineWidth=1;for(let i=0;i<5;i++){let y=10+i*(H-20)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  const width=Math.max(3,(W-24)/cs.length*.65);
+  cs.forEach((q,i)=>{let x=X(i),yo=Y(q.o),yc=Y(q.c),yh=Y(q.h),yl=Y(q.l);ctx.strokeStyle=q.c>=q.o?"#21d39a":"#ff647c";ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x,yh);ctx.lineTo(x,yl);ctx.stroke();ctx.fillRect(x-width/2,Math.min(yo,yc),width,Math.max(2,Math.abs(yc-yo)))});
+  const a=cs.map(x=>x.c); const e21v=a.map((_,i)=>ema(a.slice(0,i+1),21)).filter(x=>x!=null);ctx.strokeStyle="#20e0ef";ctx.lineWidth=3;ctx.beginPath();e21v.forEach((v,j)=>{let i=j+(a.length-e21v.length);j===0?ctx.moveTo(X(i),Y(v)):ctx.lineTo(X(i),Y(v))});ctx.stroke();
+}
+$("symbol").onchange=()=>{
+  ticks=[];candles=[];lastSignal="WAIT";
+  if(ws && ws.readyState===WebSocket.OPEN) requestHistory(); else connect();
+};
+$("tf").onchange=()=>{buildCandles();render();analyze()};
+$("analyze").onclick=()=>{buildCandles();render();analyze()};
+$("scan").onclick=()=>alert("Scanner mode: this prototype analyzes the selected index. A multi-index scanner can be added next.");
+$("notify").onclick=async()=>{if("Notification" in window){let p=await Notification.requestPermission();alertReady=p==="granted";$("notify").textContent=alertReady?"ALERTS ENABLED":"ENABLE ALERTS"}else alert("Browser notifications are not available here.")};
+$("clear").onclick=()=>{ticks=[];candles=[];$("price").textContent="—";$("signal").querySelector(".big").textContent="WAITING";requestHistory()};
+setInterval(()=>{if(candles.length){render();analyze()}},5000);
+connect();
+</script>
+</body>
+</html>

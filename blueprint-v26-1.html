@@ -1,0 +1,624 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Blueprint Market Analyzer</title>
+<style>
+:root{--bg:#06163d;--panel:#0b255f;--panel2:#0e2d70;--line:#1f4eaa;--text:#eef5ff;--muted:#9db4dd;--cyan:#20e0ef;--green:#21d39a;--red:#ff647c;--yellow:#ffd45c}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(180deg,#06143a,#08235d 55%,#06183f);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif}
+.app{max-width:520px;margin:auto;min-height:100vh;padding:12px 12px 28px}.top{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}.brand{font-weight:800;letter-spacing:.4px}.brand small{display:block;color:#6ee9ff;font-size:10px;letter-spacing:1.2px}.status{font-size:11px;padding:6px 9px;border:1px solid #2861bf;border-radius:999px;color:var(--muted)}.status.on{color:#7ff6c5;border-color:#168e73}
+.card{background:linear-gradient(180deg,rgba(17,53,125,.95),rgba(8,31,78,.98));border:1px solid #2353a2;border-radius:16px;padding:12px;margin:10px 0;box-shadow:0 8px 25px rgba(0,0,0,.18)}
+.row{display:flex;gap:8px;align-items:center}.grow{flex:1}label{font-size:10px;color:var(--muted);display:block;margin-bottom:5px}.select,button{width:100%;border:1px solid #3670d0;background:#092258;color:#fff;border-radius:11px;padding:11px;font-weight:700}.select{appearance:auto}button{cursor:pointer}button.primary{background:linear-gradient(90deg,#0ed4e8,#29aeea);color:#02163d;border:0}button.secondary{background:#0a2b69}.tiny{font-size:10px;color:var(--muted)}
+.hero{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center}.symbol{font-weight:800;font-size:18px}.price{font-size:28px;font-weight:900}.change{font-size:12px}.bull{color:var(--green)}.bear{color:var(--red)}.neutral{color:var(--yellow)}
+canvas{width:100%;height:220px;background:#061b45;border-radius:12px;border:1px solid #1a448f;display:block}
+.signal{border-radius:14px;padding:13px;text-align:center;border:1px solid #2b63bd;background:#071d49}.signal .big{font-size:27px;font-weight:900;letter-spacing:1px}.signal.buy{border-color:#159c7b}.signal.sell{border-color:#b63b55}.signal.wait{border-color:#b68a25}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.metric{background:#08235a;border:1px solid #1a438c;border-radius:11px;padding:10px}.metric b{display:block;font-size:15px;margin-top:3px}.metric span{font-size:10px;color:var(--muted)}
+.scorebar{height:8px;border-radius:99px;background:#071735;overflow:hidden}.scorefill{height:100%;width:0;background:linear-gradient(90deg,#ffd45c,#20e0ef);transition:.3s}
+.table{width:100%;border-collapse:collapse;font-size:11px}.table td{padding:7px 2px;border-bottom:1px solid #174184}.table td:last-child{text-align:right;font-weight:800}
+.footer{font-size:9px;color:#7f99c5;text-align:center;margin-top:14px;line-height:1.5}.danger{color:#ffb4bf}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="top">
+    <div class="brand">BLUEPRINT <small>MARKET ANALYZER PRO</small></div>
+    <div id="conn" class="status">Connecting…</div>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <div class="grow"><label>VOLATILITY INDEX</label>
+        <select id="symbol" class="select">
+          <option value="1HZ25V">Volatility 25 (1s)</option>
+          <option value="1HZ10V">Volatility 10 (1s)</option>
+          <option value="1HZ50V">Volatility 50 (1s)</option>
+          <option value="1HZ75V">Volatility 75 (1s)</option>
+          <option value="1HZ100V">Volatility 100 (1s)</option>
+          <option value="R_25">Volatility 25</option>
+          <option value="R_50">Volatility 50</option>
+          <option value="R_75">Volatility 75</option>
+          <option value="R_100">Volatility 100</option>
+        </select>
+      </div>
+      <div style="width:110px"><label>TIMEFRAME</label>
+        <select id="tf" class="select"><option value="60">1 minute</option><option value="300">5 minutes</option><option value="900">15 minutes</option></select>
+      </div>
+    </div>
+  </div>
+
+  <div class="card hero">
+    <div><div id="name" class="symbol">Volatility 25 (1s)</div><div class="tiny">Live market price</div></div>
+    <div style="text-align:right"><div id="price" class="price">—</div><div id="chg" class="change neutral">Waiting for data</div></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>Volatility · Candlestick Chart</b><span id="trendText" class="tiny">—</span></div>
+    <canvas id="chart" width="1000" height="440"></canvas>
+  </div>
+
+  <div class="card">
+    <div class="row">
+      <button id="analyze" class="primary">GENERATE ANALYSIS</button>
+      <button id="scan" class="secondary">SCANNER</button>
+    </div>
+    <div style="margin-top:10px" class="signal wait" id="signal">
+      <div class="tiny">CURRENT ANALYSIS</div><div class="big">WAITING</div><div id="signalReason" class="tiny">Collecting live ticks…</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>ANALYSIS SCORE</label>
+    <div class="row"><div class="scorebar grow"><div id="scorefill" class="scorefill"></div></div><b id="score">0/10</b></div>
+    <div class="grid" style="margin-top:9px">
+      <div class="metric"><span>Trend</span><b id="trend">—</b></div>
+      <div class="metric"><span>Momentum</span><b id="momentum">—</b></div>
+      <div class="metric"><span>RSI</span><b id="rsi">—</b></div>
+      <div class="metric"><span>ADX</span><b id="adx">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>LIVE VOLATILITY SCANNER</b><span id="scanStatus" class="tiny">OFF</span></div>
+    <div id="scannerRows" class="tiny">Press SCANNER to start.</div>
+  </div>
+
+
+  <div class="card" id="bestSetupCard">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>BEST SETUP</b><span id="bestState" class="tiny">WAITING</span></div>
+    <div class="signal wait" id="bestSignal">
+      <div class="tiny">STRONGEST LIVE OPPORTUNITY</div><div class="big" id="bestDirection">NO TRADE</div>
+      <div id="bestReason" class="tiny">Start Scanner and wait for 9/9 markets to load.</div>
+    </div>
+    <div class="grid" style="margin-top:9px">
+      <div class="metric"><span>Market</span><b id="bestMarket">—</b></div>
+      <div class="metric"><span>Strength</span><b id="bestScore">—</b></div>
+      <div class="metric"><span>Entry</span><b id="bestEntry">—</b></div>
+      <div class="metric"><span>RSI</span><b id="bestRsi">—</b></div>
+      <div class="metric"><span>Stop Loss</span><b id="bestSl">—</b></div>
+      <div class="metric"><span>Take Profit 1</span><b id="bestTp1">—</b></div>
+      <div class="metric"><span>Take Profit 2</span><b id="bestTp2">—</b></div>
+      <div class="metric"><span>ADX</span><b id="bestAdx">—</b></div>
+    </div>
+    <div id="bestNote" class="tiny" style="margin-top:9px">No automatic trading. This is a rule-based market ranking tool.</div>
+  </div>
+
+
+  <div class="card" id="digitCard">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>DIGIT CONTRACT ANALYZER</b><span id="digitState" class="tiny">WAITING</span></div>
+    <div class="grid">
+      <div class="metric"><span>Matches</span><b id="digitMatches">—</b></div>
+      <div class="metric"><span>Differs</span><b id="digitDiffers">—</b></div>
+      <div class="metric"><span>Even</span><b id="digitEven">—</b></div>
+      <div class="metric"><span>Odd</span><b id="digitOdd">—</b></div>
+      <div class="metric"><span>Over 4</span><b id="digitOver">—</b></div>
+      <div class="metric"><span>Under 5</span><b id="digitUnder">—</b></div>
+    </div>
+    <div class="grid" style="margin-top:8px">
+      <div class="metric"><span>Sample</span><b id="digitSample">—</b></div>
+      <div class="metric"><span>Stability</span><b id="digitStability">—</b></div>
+      <div class="metric"><span>Recent window</span><b id="digitRecent">—</b></div>
+      <div class="metric"><span>Quality</span><b id="digitQuality">—</b></div>
+    </div>
+    <div class="signal wait" id="digitSignal" style="margin-top:9px">
+      <div class="tiny">STRONGEST DIGIT SETUP</div><div class="big" id="digitBest">WAIT</div>
+      <div id="digitReason" class="tiny">Collecting recent ticks…</div>
+    </div>
+    <div class="tiny" style="margin-top:9px">Digit statistics are based on recent live ticks. They are not guaranteed predictions or a win probability.</div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>TRADE PLAN</b><span id="planState" class="tiny">WAIT</span></div>
+    <div class="grid">
+      <div class="metric"><span>Entry</span><b id="entry">—</b></div>
+      <div class="metric"><span>Direction</span><b id="direction">WAIT</b></div>
+      <div class="metric"><span>Stop Loss</span><b id="sl">—</b></div>
+      <div class="metric"><span>Risk (ATR)</span><b id="risk">—</b></div>
+      <div class="metric"><span>Take Profit 1</span><b id="tp1">—</b></div>
+      <div class="metric"><span>Take Profit 2</span><b id="tp2">—</b></div>
+    </div>
+    <div id="planNote" class="tiny" style="margin-top:9px">Wait for a confirmed setup. This is analysis only; no trades are placed.</div>
+  </div>
+
+  <div class="card">
+    <label>STRATEGY MATCHES</label>
+    <table class="table">
+      <tr><td>EMA trend (9 / 21 / 50)</td><td id="m1">—</td></tr>
+      <tr><td>RSI momentum</td><td id="m2">—</td></tr>
+      <tr><td>MACD direction</td><td id="m3">—</td></tr>
+      <tr><td>ADX trend strength</td><td id="m4">—</td></tr>
+      <tr><td>Breakout / structure</td><td id="m5">—</td></tr>
+      <tr><td>Volatility filter</td><td id="m6">—</td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <div class="grid">
+      <div class="metric"><span>Support</span><b id="support">—</b></div>
+      <div class="metric"><span>Resistance</span><b id="resistance">—</b></div>
+      <div class="metric"><span>ATR</span><b id="atr">—</b></div>
+      <div class="metric"><span>Last update</span><b id="updated">—</b></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between;margin-bottom:8px"><b>ALERT CENTER</b><span id="alertState" class="tiny">OFF</span></div>
+    <div class="grid">
+      <button id="notify" class="secondary">ENABLE ALERTS</button>
+      <button id="clear" class="secondary">RESET</button>
+    </div>
+    <div id="alertLog" class="tiny" style="margin-top:9px">No new signal alerts.</div>
+  </div>
+
+  <div class="footer">If connection fails, the analyzer automatically tries Deriv's public market-data endpoints. Keep the page open in Chrome with an active internet connection.<br><br>For analysis/education only. Signals are rule-based and are not guaranteed to be profitable. This version reads public Deriv market data; it does not place trades.</div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const names={"1HZ25V":"Volatility 25 (1s)","1HZ10V":"Volatility 10 (1s)","1HZ50V":"Volatility 50 (1s)","1HZ75V":"Volatility 75 (1s)","1HZ100V":"Volatility 100 (1s)",R_25:"Volatility 25",R_50:"Volatility 50",R_75:"Volatility 75",R_100:"Volatility 100"};
+let ws=null, ticks=[], candles=[], lastPrice=null, lastSignal="WAIT", alertReady=false, timer=null, endpointIndex=0, connectionTimer=null, digitTicks=[];
+const ENDPOINTS=["wss://api.derivws.com/trading/v1/options/ws/public"];
+
+function connect(){
+  if(ws) try{ws.close()}catch(e){}
+  if(connectionTimer) clearTimeout(connectionTimer);
+  const endpoint=ENDPOINTS[endpointIndex];
+  $("conn").textContent="Connecting…"; $("conn").className="status";
+  ws=new WebSocket(endpoint);
+  let opened=false;
+  connectionTimer=setTimeout(()=>{
+    if(!opened && ws && ws.readyState!==WebSocket.OPEN){
+      try{ws.close()}catch(e){}
+      if(endpointIndex<ENDPOINTS.length-1){ endpointIndex++; connect(); }
+      else { $("conn").textContent="Connection delayed — retrying…"; $("conn").className="status"; $("signalReason").textContent="Waiting for Deriv market-data connection…"; setTimeout(()=>{endpointIndex=0;connect()},1000); }
+    }
+  },15000);
+  ws.onopen=()=>{
+    opened=true; clearTimeout(connectionTimer); endpointIndex=0;
+    $("conn").textContent="LIVE"; $("conn").className="status on";
+    requestCandleHistory();
+    requestDigitHistory();
+    ws.send(JSON.stringify({ticks:$('symbol').value,subscribe:1,req_id:12}));
+  };
+  ws.onmessage=e=>{
+    let d; try{d=JSON.parse(e.data)}catch(_){return}
+    if(d.error){ $("signalReason").textContent="History error: "+(d.error.message||d.error.code||"Deriv API error"); return; }
+    if(Array.isArray(d.errors) && d.errors.length){ $("signalReason").textContent="History error: "+(d.errors[0].message||d.errors[0].code||"Deriv API error"); return; }
+        if(d.msg_type==="history" && d.history?.prices){
+      digitTicks=d.history.prices.map((p,i)=>({p:Number(p),t:Number(d.history.times[i])})).filter(x=>Number.isFinite(x.p));
+      updateDigitAnalyzer();
+    }
+    if(d.msg_type==="candles" && Array.isArray(d.candles)){
+      candles=d.candles.map(q=>({
+        t:Number(q.epoch),
+        o:Number(q.open),
+        h:Number(q.high),
+        l:Number(q.low),
+        c:Number(q.close)
+      })).filter(q=>[q.t,q.o,q.h,q.l,q.c].every(Number.isFinite)).slice(-120);
+      if(candles.length){
+        lastPrice=candles[candles.length-1].c;
+        $("price").textContent=fmt(lastPrice);
+        $("signalReason").textContent=`Historical candles loaded: ${candles.length}`;
+        render(); analyze();
+      }
+    }
+    if(d.msg_type==="history" && d.history?.prices){
+      ticks=d.history.prices.map((p,i)=>({p:Number(p),t:Number(d.history.times[i])}));
+      buildCandles();
+      
+      render(); analyze();
+    }
+    if(d.msg_type==="tick" && d.tick){
+      const t={p:Number(d.tick.quote),t:Number(d.tick.epoch)};
+      lastPrice=t.p;
+      digitTicks.push(t); if(digitTicks.length>1000)digitTicks.shift();
+      $("price").textContent=t.p;
+      updateDigitAnalyzer();
+      if(candles.length < 55) $("signalReason").textContent=`Collecting candles: ${candles.length}/55 · Live ticks received`;
+      ticks.push(t); if(ticks.length>3000)ticks.shift();
+      const sec=Number($('tf').value), bucket=Math.floor(t.t/sec)*sec;
+      let c=candles[candles.length-1];
+      if(!c || c.t!==bucket){
+        c={t:bucket,o:t.p,h:t.p,l:t.p,c:t.p};
+        candles.push(c);
+        if(candles.length>120)candles.shift();
+      }else{
+        c.h=Math.max(c.h,t.p); c.l=Math.min(c.l,t.p); c.c=t.p;
+      }
+      render(); analyze();
+    }
+  };
+  ws.onerror=()=>{};
+  ws.onclose=()=>{
+    if($("conn").textContent==="LIVE") $("conn").textContent="Disconnected";
+    setTimeout(()=>{if(!ws || ws.readyState===WebSocket.CLOSED) connect()},3000);
+  };
+}
+
+function selectActiveSymbol(list){
+  const wanted=$("symbol").value;
+  const found=list.find(x=>(x.symbol||x.underlying_symbol)===wanted);
+  return found ? (found.symbol||found.underlying_symbol) : wanted;
+}
+
+function subscribeSymbol(symbol){
+  if(!ws || ws.readyState!==WebSocket.OPEN) return;
+  requestCandleHistory(symbol);
+  ws.send(JSON.stringify({ticks:symbol,subscribe:1,req_id:12}));
+}
+
+function requestCandleHistory(symbol=$('symbol').value){
+  if(ws && ws.readyState===WebSocket.OPEN){
+    const sec=Number($('tf').value);
+    const start=Math.floor(Date.now()/1000)-sec*130;
+    ws.send(JSON.stringify({
+      ticks_history:symbol,
+      start:start,
+      end:"latest",
+      count:120,
+      style:"candles",
+      granularity:sec,
+      adjust_start_time:1,
+      req_id:21
+    }));
+  }
+}
+function requestDigitHistory(symbol=$('symbol').value){
+  if(ws && ws.readyState===WebSocket.OPEN){
+    ws.send(JSON.stringify({ticks_history:symbol,end:"latest",count:200,style:"ticks",req_id:31}));
+  }
+}
+
+function lastDigit(price){
+  const txt=String(price);
+  const m=txt.replace(/[^0-9]/g,"");
+  return m?Number(m.slice(-1)):null;
+}
+function pct(v){return v*100}
+function classifyDigit(d){
+  return {
+    name:d===null?'—':String(d),
+    match:d===null?0:(d===0?0:0)
+  };
+}
+function windowStats(ds){
+  const n=ds.length, counts=Array(10).fill(0);
+  ds.forEach(d=>counts[d]++);
+  const p=counts.map(c=>c/n*100);
+  const ranked=[...Array(10).keys()].sort((a,b)=>counts[b]-counts[a]);
+  const md=ranked[0];
+  return {
+    n, counts, pct:p, matchDigit:md, matchPct:p[md], differPct:100-p[md],
+    even:ds.filter(d=>d%2===0).length/n*100,
+    odd:ds.filter(d=>d%2===1).length/n*100,
+    over:ds.filter(d=>d>4).length/n*100,
+    under:ds.filter(d=>d<5).length/n*100
+  };
+}
+function digitStats(){
+  const ds=digitTicks.map(x=>lastDigit(x.p)).filter(Number.isInteger);
+  if(ds.length<50)return null;
+  const recent=ds.slice(-50), mid=ds.slice(-100), full=ds.slice(-200);
+  const a=windowStats(recent), b=windowStats(mid), c=windowStats(full);
+  const last=ds.at(-1);
+  const candidates=[
+    {key:'match',name:`MATCH ${c.matchDigit}`,value:c.matchPct,base:10,windows:[a.pct[c.matchDigit],b.pct[c.matchDigit],c.matchPct],target:c.matchDigit},
+    {key:'differ',name:`DIFFERS ${c.matchDigit}`,value:c.differPct,base:90,windows:[a.differPct,b.differPct,c.differPct],target:c.matchDigit},
+    {key:'even',name:'EVEN',value:c.even,base:50,windows:[a.even,b.even,c.even]},
+    {key:'odd',name:'ODD',value:c.odd,base:50,windows:[a.odd,b.odd,c.odd]},
+    {key:'over',name:'OVER 4',value:c.over,base:50,windows:[a.over,b.over,c.over]},
+    {key:'under',name:'UNDER 5',value:c.under,base:50,windows:[a.under,b.under,c.under]}
+  ];
+  for(const q of candidates){
+    const [w50,w100,w200]=q.windows;
+    const signs=q.base===90 ? q.windows.map(v=>v-q.base) : q.windows.map(v=>v-q.base);
+    const positive=signs.every(v=>v>0);
+    const edge=q.value-q.base;
+    const stability=100-Math.min(100,Math.abs(w50-w200)*3 + Math.abs(w100-w200)*2);
+    q.edge=edge; q.stability=Math.max(0,stability); q.consistent=positive;
+    q.quality=Math.max(0, Math.min(100, 50 + edge*4 + (q.consistent?12:0) + (q.stability-50)*0.35));
+  }
+  candidates.sort((x,y)=>y.quality-x.quality);
+  const best=candidates[0];
+  // Conservative gates: compare to the natural baseline and require cross-window confirmation.
+  const minEdge=best.key==='match'?2.0:best.key==='differ'?2.0:4.0;
+  const minValue=best.key==='match'?12:best.key==='differ'?92:56;
+  const strong=best.edge>=minEdge && best.value>=minValue && best.consistent && best.stability>=65;
+  return {ds,a,b,c,last,candidates,best,strong};
+}
+function updateDigitAnalyzer(){
+  const x=digitStats();
+  if(!x){
+    $("digitState").textContent=`COLLECTING · ${digitTicks.length}/50`;
+    return;
+  }
+  $("digitState").textContent=`LIVE · ${x.c.n} ticks`;
+  $("digitMatches").textContent=`${x.c.matchPct.toFixed(1)}% · ${x.c.matchDigit}`;
+  $("digitDiffers").textContent=`${x.c.differPct.toFixed(1)}% · ${x.c.matchDigit}`;
+  $("digitEven").textContent=`${x.c.even.toFixed(1)}%`;
+  $("digitOdd").textContent=`${x.c.odd.toFixed(1)}%`;
+  $("digitOver").textContent=`${x.c.over.toFixed(1)}%`;
+  $("digitUnder").textContent=`${x.c.under.toFixed(1)}%`;
+  $("digitSample").textContent=`${x.c.n} ticks`;
+  $("digitStability").textContent=`${x.best.stability.toFixed(0)}%`;
+  $("digitRecent").textContent=`50 / 100 / ${x.c.n}`;
+  $("digitQuality").textContent=x.strong?'STRONG':(x.best.edge>0?'CAUTION':'NO EDGE');
+  $("digitBest").textContent=x.strong?x.best.name:"WAIT";
+  $("digitSignal").className="signal "+(x.strong?(x.best.key==='match'||x.best.key==='differ'?"sell":"buy"):"wait");
+  if(x.strong){
+    $("digitReason").textContent=`${x.best.name} · ${x.best.value.toFixed(1)}% vs ${x.best.base}% baseline · edge +${x.best.edge.toFixed(1)} · stable ${x.best.stability.toFixed(0)}%`;
+  } else {
+    $("digitReason").textContent=`Best candidate ${x.best.name} · ${x.best.value.toFixed(1)}% vs ${x.best.base}% baseline · edge ${x.best.edge>=0?'+':''}${x.best.edge.toFixed(1)}. Need stronger, stable confirmation.`;
+  }
+}
+function requestHistory(){
+  if(ws && ws.readyState===WebSocket.OPEN){
+    requestCandleHistory();
+    ws.send(JSON.stringify({ticks:$('symbol').value,subscribe:1,req_id:12}));
+  }
+}
+
+// Symbol selection is sent directly to Deriv after connection.
+
+function buildCandles(){
+  const sec=Number($("tf").value), map=new Map();
+  for(const x of ticks){const bucket=Math.floor(x.t/sec)*sec;if(!map.has(bucket))map.set(bucket,{t:bucket,o:x.p,h:x.p,l:x.p,c:x.p});let c=map.get(bucket);c.h=Math.max(c.h,x.p);c.l=Math.min(c.l,x.p);c.c=x.p}
+  candles=[...map.values()].slice(-120);
+}
+function ema(a,n){if(a.length<n)return null;let k=2/(n+1),v=a.slice(0,n).reduce((x,y)=>x+y,0)/n;for(let i=n;i<a.length;i++)v=a[i]*k+v*(1-k);return v}
+function rsi(a,n=14){if(a.length<=n)return null;let g=0,l=0;for(let i=1;i<=n;i++){let d=a[i]-a[i-1];if(d>=0)g+=d;else l-=d}let ag=g/n,al=l/n;for(let i=n+1;i<a.length;i++){let d=a[i]-a[i-1];ag=(ag*(n-1)+Math.max(d,0))/n;al=(al*(n-1)+Math.max(-d,0))/n}return al===0?100:100-100/(1+ag/al)}
+function atr(cs,n=14){if(cs.length<=n)return null;let tr=[];for(let i=1;i<cs.length;i++)tr.push(Math.max(cs[i].h-cs[i].l,Math.abs(cs[i].h-cs[i-1].c),Math.abs(cs[i].l-cs[i-1].c)));return tr.slice(-n).reduce((a,b)=>a+b,0)/n}
+function macd(a){if(a.length<35)return null;let fast=ema(a,12),slow=ema(a,26);let line=fast-slow;let arr=[];for(let i=26;i<a.length;i++)arr.push(ema(a.slice(0,i+1),12)-ema(a.slice(0,i+1),26));let sig=ema(arr,9);return {line,sig,hist:line-(sig??line)}}
+function adx(cs,n=14){if(cs.length<2*n+2)return null;let trs=[],pdm=[],mdm=[];for(let i=1;i<cs.length;i++){let up=cs[i].h-cs[i-1].h,down=cs[i-1].l-cs[i].l;trs.push(Math.max(cs[i].h-cs[i].l,Math.abs(cs[i].h-cs[i-1].c),Math.abs(cs[i].l-cs[i-1].c)));pdm.push(up>down&&up>0?up:0);mdm.push(down>up&&down>0?down:0)}let tr=trs.slice(-n).reduce((a,b)=>a+b,0),p=pdm.slice(-n).reduce((a,b)=>a+b,0),m=mdm.slice(-n).reduce((a,b)=>a+b,0);let pi=tr?100*p/tr:0,mi=tr?100*m/tr:0;return (pi+mi)?100*Math.abs(pi-mi)/(pi+mi):0}
+function analysis(){
+  if(candles.length<55)return null;
+  const a=candles.map(x=>x.c), e9=ema(a,9),e21=ema(a,21),e50=ema(a,50),R=rsi(a),A=atr(candles),M=macd(a),D=adx(candles),p=a.at(-1), highs=candles.slice(-20).map(x=>x.h), lows=candles.slice(-20).map(x=>x.l),res=Math.max(...highs),sup=Math.min(...lows);
+  let bull=0,bear=0;
+  const add=(b,s=1)=>b?bull+=s:bear+=s;
+  add(e9>e21&&e21>e50,2); add(e9<e21&&e21<e50,2);
+  add(R>55,1); add(R<45,1);
+  add(M?.hist>0,1); add(M?.hist<0,1);
+  add(D>=20&&e9>e21,1); add(D>=20&&e9<e21,1);
+  add(p>res-A*.15,1); add(p<sup+A*.15,1);
+  const total=Math.min(10,Math.max(bull,bear)), signal=total>=7?(bull>bear?"BUY":bear>bull?"SELL":"WAIT"):"WAIT";
+  const confidence=total*10;
+  const stopDist=Math.max(A*1.5, A||0);
+  const entry=p;
+  const sl=signal==="BUY"?entry-stopDist:signal==="SELL"?entry+stopDist:null;
+  const tp1=signal==="BUY"?entry+stopDist*1.5:signal==="SELL"?entry-stopDist*1.5:null;
+  const tp2=signal==="BUY"?entry+stopDist*2.5:signal==="SELL"?entry-stopDist*2.5:null;
+  return {p,e9,e21,e50,R,A,M,D,res,sup,bull,bear,total,signal,confidence,entry,sl,tp1,tp2,stopDist};
+}
+function fmt(x){return x==null?"—":Number(x).toFixed(2)}
+function setMatch(id,v){$(id).textContent=v?"MATCH":"NO";$(id).className=v?"bull":"bear"}
+function analyze(){
+  const x=analysis(); if(!x)return;
+  $("price").textContent=fmt(x.p); $("rsi").textContent=fmt(x.R); $("adx").textContent=fmt(x.D); $("atr").textContent=fmt(x.A);
+  $("support").textContent=fmt(x.sup); $("resistance").textContent=fmt(x.res); $("updated").textContent=new Date().toLocaleTimeString();
+  const tr=x.e9>x.e21&&x.e21>x.e50?"BULLISH":x.e9<x.e21&&x.e21<x.e50?"BEARISH":"MIXED";
+  $("trend").textContent=tr;$("trendText").textContent=tr;
+  const mom=x.R>=55&&x.M?.hist>0?"BULLISH":x.R<=45&&x.M?.hist<0?"BEARISH":"MIXED";$("momentum").textContent=mom;
+  $("m1").textContent=(tr==="BULLISH"||tr==="BEARISH")?"MATCH":"MIXED";
+  setMatch("m2",x.R>=55||x.R<=45); setMatch("m3",!!(x.M&&(x.M.hist>0||x.M.hist<0))); setMatch("m4",x.D>=20);
+  setMatch("m5",x.p>x.res-x.A*.15||x.p<x.sup+x.A*.15); setMatch("m6",x.A>0);
+  $("score").textContent=x.total+"/10";$("scorefill").style.width=(x.total*10)+"%";
+  $("entry").textContent=fmt(x.entry); $("direction").textContent=x.signal; $("risk").textContent=fmt(x.stopDist);
+  $("sl").textContent=fmt(x.sl); $("tp1").textContent=fmt(x.tp1); $("tp2").textContent=fmt(x.tp2);
+  $("planState").textContent=x.signal+" · SCORE "+x.total+"/10";
+  $("planState").className="tiny "+(x.signal==="BUY"?"bull":x.signal==="SELL"?"bear":"neutral");
+  $("direction").className=x.signal==="BUY"?"bull":x.signal==="SELL"?"bear":"neutral";
+  $("planNote").textContent=x.signal==="WAIT"?"No trade plan yet — wait for confirmation.":`Entry ${fmt(x.entry)} · SL ${fmt(x.sl)} · TP1 ${fmt(x.tp1)} · TP2 ${fmt(x.tp2)}. Analysis only.`;
+  $("signal").className="signal "+(x.signal==="BUY"?"buy":x.signal==="SELL"?"sell":"wait");
+  $("signal").querySelector(".big").textContent=x.signal;
+  $("signalReason").textContent=x.signal==="WAIT"?"Conditions are mixed — wait for confirmation.":`Rule match: ${x.total}/10 · Trend ${tr.toLowerCase()} · Momentum ${mom.toLowerCase()}`;
+  $("chg").textContent=lastPrice==null?"Live":(lastPrice>x.p? "↑ live":"↓ live");
+  $("chg").className="change "+(lastPrice==null?"neutral":lastPrice>x.p?"bull":"bear");
+  if(x.signal!==lastSignal && x.signal!=="WAIT"){
+    const msg=names[$("symbol").value]+": "+x.signal+" · "+x.total+"/10 · Entry "+fmt(x.entry)+" · SL "+fmt(x.sl)+" · TP1 "+fmt(x.tp1)+" · TP2 "+fmt(x.tp2);
+    $("alertLog").textContent="Signal: "+msg;
+    if(alertReady){ if(navigator.vibrate)navigator.vibrate([200,100,200]); if(Notification.permission==="granted")new Notification("Blueprint signal",{body:msg});}
+  }
+  lastSignal=x.signal;
+}
+function render(){
+  const c=$("chart"),ctx=c.getContext("2d"),W=c.width,H=c.height;ctx.clearRect(0,0,W,H);
+  const cs=candles.slice(-55);if(cs.length<2)return;let min=Math.min(...cs.map(x=>x.l)),max=Math.max(...cs.map(x=>x.h)),pad=(max-min)*.08||1;min-=pad;max+=pad;
+  const X=i=>i*(W-24)/(cs.length-1)+12,Y=p=>H-18-(p-min)*(H-36)/(max-min);
+  ctx.strokeStyle="#123b78";ctx.lineWidth=1;for(let i=0;i<5;i++){let y=10+i*(H-20)/4;ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke()}
+  const width=Math.max(3,(W-24)/cs.length*.65);
+  cs.forEach((q,i)=>{let x=X(i),yo=Y(q.o),yc=Y(q.c),yh=Y(q.h),yl=Y(q.l);ctx.strokeStyle=q.c>=q.o?"#21d39a":"#ff647c";ctx.fillStyle=ctx.strokeStyle;ctx.beginPath();ctx.moveTo(x,yh);ctx.lineTo(x,yl);ctx.stroke();ctx.fillRect(x-width/2,Math.min(yo,yc),width,Math.max(2,Math.abs(yc-yo)))});
+  const a=cs.map(x=>x.c); const e21v=a.map((_,i)=>ema(a.slice(0,i+1),21)).filter(x=>x!=null);ctx.strokeStyle="#20e0ef";ctx.lineWidth=3;ctx.beginPath();e21v.forEach((v,j)=>{let i=j+(a.length-e21v.length);j===0?ctx.moveTo(X(i),Y(v)):ctx.lineTo(X(i),Y(v))});ctx.stroke();
+}
+
+const scanSymbols=["1HZ10V","1HZ25V","1HZ50V","1HZ75V","1HZ100V","R_25","R_50","R_75","R_100"];
+let scanWs=null, scanData={}, scanReq={};
+function startScanner(){
+  if(scanWs)try{scanWs.close()}catch(e){}
+  scanData={}; scanReq={};
+  $("scanStatus").textContent="Loading history…";
+  renderScanner();
+  scanWs=new WebSocket(ENDPOINTS[0]);
+  scanWs.onopen=()=>{
+    $("scanStatus").textContent="LIVE · loading 9 markets";
+    scanSymbols.forEach((s,i)=>{
+      const id=1000+i; scanReq[id]=s;
+      // Request real 1-minute candles directly. No subscribe:0 is used.
+      scanWs.send(JSON.stringify({
+        ticks_history:s,end:"latest",count:100,style:"candles",
+        granularity:60,req_id:id
+      }));
+      // Then stream ticks so the latest candle stays current.
+      scanWs.send(JSON.stringify({ticks:s,subscribe:1,req_id:2000+i}));
+    });
+  };
+  scanWs.onmessage=e=>{
+    let d;try{d=JSON.parse(e.data)}catch(_){return}
+    if(d.error){
+      const s=scanReq[Number(d.req_id)];
+      if(s) scanData[s]={error:d.error.message||"History error"};
+      renderScanner(); return;
+    }
+    if(d.msg_type==="candles" && Array.isArray(d.candles)){
+      const s=scanReq[Number(d.req_id)];
+      if(s){
+        scanData[s]=d.candles.map(q=>({
+          t:Number(q.epoch),o:Number(q.open),h:Number(q.high),l:Number(q.low),c:Number(q.close)
+        })).filter(q=>[q.t,q.o,q.h,q.l,q.c].every(Number.isFinite)).slice(-120);
+        renderScanner();
+      }
+    }
+    if(d.msg_type==="tick"&&d.tick){
+      const s=d.tick.symbol||d.echo_req?.ticks;
+      if(!s)return;
+      const t=Number(d.tick.epoch), p=Number(d.tick.quote);
+      if(!Number.isFinite(t)||!Number.isFinite(p))return;
+      if(!Array.isArray(scanData[s])) scanData[s]=[];
+      const b=Math.floor(t/60)*60;
+      let c=scanData[s].at(-1);
+      if(!c || c.t!==b){
+        c={t:b,o:p,h:p,l:p,c:p}; scanData[s].push(c);
+      }else{
+        c.h=Math.max(c.h,p); c.l=Math.min(c.l,p); c.c=p;
+      }
+      if(scanData[s].length>120)scanData[s].shift();
+      renderScanner();
+    }
+  };
+  scanWs.onerror=()=>{$("scanStatus").textContent="Scanner connection error"};
+  scanWs.onclose=()=>{if($("scanStatus").textContent.startsWith("LIVE"))$("scanStatus").textContent="Disconnected"};
+}
+function quickScan(s){
+  const cs=scanData[s]; if(!Array.isArray(cs)||cs.length<55)return null;
+  const a=cs.map(x=>x.c);
+  const e9=ema(a,9),e21=ema(a,21),e50=ema(a,50),R=rsi(a),M=macd(a),D=adx(cs),A=atr(cs),p=a.at(-1);
+  let bull=0,bear=0;
+  if(e9>e21&&e21>e50)bull+=3; if(e9<e21&&e21<e50)bear+=3;
+  if(R>55)bull++; if(R<45)bear++;
+  if(M?.hist>0)bull++; if(M?.hist<0)bear++;
+  if(D>=20&&e9>e21)bull++; if(D>=20&&e9<e21)bear++;
+  const res=Math.max(...cs.slice(-20).map(x=>x.h)),sup=Math.min(...cs.slice(-20).map(x=>x.l));
+  if(A>0&&p>res-A*.15)bull++; if(A>0&&p<sup+A*.15)bear++;
+  const score=Math.min(10,Math.max(bull,bear)), signal=score>=6?(bull>bear?"BUY":bear>bull?"SELL":"WAIT"):"WAIT";
+  const trend=e9>e21&&e21>e50?"BULL":e9<e21&&e21<e50?"BEAR":"MIXED";
+  const momentum=R>55&&M?.hist>0?"BULL":R<45&&M?.hist<0?"BEAR":"MIXED";
+  const aligned=(signal==="BUY"&&trend==="BULL"&&momentum==="BULL")||(signal==="SELL"&&trend==="BEAR"&&momentum==="BEAR");
+  const strong=score>=7&&D>=20&&aligned;
+  const direction=strong?signal:"WAIT";
+  const stopDist=Math.max((A||0)*1.5,A||0);
+  const sl=direction==="BUY"?p-stopDist:direction==="SELL"?p+stopDist:null;
+  const tp1=direction==="BUY"?p+stopDist*1.5:direction==="SELL"?p-stopDist*1.5:null;
+  const tp2=direction==="BUY"?p+stopDist*2.5:direction==="SELL"?p-stopDist*2.5:null;
+  return {signal,direction,score,R,D,p,trend,momentum,A,sl,tp1,tp2,strong,aligned};
+}
+
+function renderScanner(){
+  const data=scanSymbols.map(s=>({s,x:quickScan(s)})).filter(o=>o.x);
+  data.sort((a,b)=>b.x.score-a.x.score);
+  const rows=scanSymbols.map(s=>{
+    const raw=scanData[s]; const x=quickScan(s);
+    if(raw?.error)return `<tr><td>${names[s]}</td><td class="bear">${raw.error}</td><td>—</td><td>—</td></tr>`;
+    if(!x)return `<tr><td>${names[s]}</td><td>Collecting…</td><td>—</td><td>—</td></tr>`;
+    const cls=x.direction==="BUY"?"bull":x.direction==="SELL"?"bear":"neutral";
+    const shown=x.direction+" · "+x.score+"/10";
+    return `<tr><td>${names[s]}</td><td class="${cls}">${shown}</td><td>RSI ${fmt(x.R)}</td><td>${x.trend}</td></tr>`;
+  }).join("");
+  $("scannerRows").innerHTML="<table class='table'><tr><td><b>INDEX</b></td><td><b>SIGNAL</b></td><td><b>RSI</b></td><td><b>TREND</b></td></tr>"+rows+"</table>";
+  const ready=scanSymbols.filter(s=>quickScan(s));
+  const strong=ready.map(s=>({s,x:quickScan(s)})).filter(o=>o.x.strong);
+  strong.sort((a,b)=>b.x.score-a.x.score || b.x.D-a.x.D);
+  const best=strong[0];
+  updateBestSetup(best,ready.length);
+  if(best) $("scanStatus").textContent="LIVE · BEST "+best.x.direction+" · "+ready.length+"/9 ready";
+  else if(ready.length===9) $("scanStatus").textContent="LIVE · NO STRONG SETUP · 9/9 ready";
+  else $("scanStatus").textContent="LIVE · "+ready.length+"/9 markets ready";
+}
+function updateBestSetup(best,readyCount){
+  if(!best){
+    $("bestState").textContent=readyCount===9?"NO TRADE":"LOADING";
+    $("bestState").className="tiny neutral";
+    $("bestSignal").className="signal wait";
+    $("bestDirection").textContent=readyCount===9?"NO TRADE":"WAITING";
+    $("bestReason").textContent=readyCount===9?"No setup meets the strong filters: score ≥7, ADX ≥20, aligned trend and momentum.":`Waiting for all markets · ${readyCount}/9 ready.`;
+    ["bestMarket","bestScore","bestEntry","bestRsi","bestSl","bestTp1","bestTp2","bestAdx"].forEach(id=>$(id).textContent="—");
+    return;
+  }
+  const x=best.x;
+  $("bestState").textContent=x.direction+" · STRONG";
+  $("bestState").className="tiny "+(x.direction==="BUY"?"bull":"bear");
+  $("bestSignal").className="signal "+(x.direction==="BUY"?"buy":"sell");
+  $("bestDirection").textContent=x.direction;
+  $("bestReason").textContent=`${names[best.s]} · ${x.score}/10 · ${x.trend} trend · ${x.momentum} momentum`;
+  $("bestMarket").textContent=names[best.s];
+  $("bestScore").textContent=x.score+"/10";
+  $("bestEntry").textContent=fmt(x.p); $("bestRsi").textContent=fmt(x.R);
+  $("bestSl").textContent=fmt(x.sl); $("bestTp1").textContent=fmt(x.tp1); $("bestTp2").textContent=fmt(x.tp2); $("bestAdx").textContent=fmt(x.D);
+  $("bestNote").textContent="Strongest rule-based setup among the 9 markets. Score is a rule strength, not a win probability. Confirm the next candle before acting; analysis only.";
+}
+
+function scannerAlert(){
+  if(!alertReady)return;
+  const now=Date.now();
+  if(now-(scannerAlert.last||0)<60000)return;
+  const hits=scanSymbols.map(s=>({s,x:quickScan(s)})).filter(o=>o.x&&o.x.strong);
+  if(!hits.length)return;
+  const top=hits.sort((a,b)=>b.x.score-a.x.score)[0];
+  const key=top.s+top.x.signal;
+  if(scannerAlert.lastKey===key)return;
+  scannerAlert.last=now;scannerAlert.lastKey=key;
+  const msg=names[top.s]+": "+top.x.direction+" · strong setup "+top.x.score+"/10 · RSI "+fmt(top.x.R)+" · ADX "+fmt(top.x.D);
+  $("alertLog").textContent="Alert: "+msg;
+  if(navigator.vibrate)navigator.vibrate([200,100,200]);
+  if(Notification.permission==="granted")new Notification("Blueprint scanner signal",{body:msg});
+}
+
+$("symbol").onchange=()=>{
+  ticks=[]; candles=[]; digitTicks=[]; lastSignal="WAIT"; lastPrice=null;
+  $("name").textContent=names[$("symbol").value]||$("symbol").value;
+  $("price").textContent="—"; $("signalReason").textContent="Loading market data…";
+  if(ws && ws.readyState===WebSocket.OPEN){
+    try{ws.send(JSON.stringify({ticks:$('symbol').value,subscribe:1,req_id:12}))}catch(e){}
+    requestCandleHistory(); requestDigitHistory();
+  }
+};
+$("tf").onchange=()=>{
+  candles=[]; ticks=[]; lastSignal="WAIT";
+  $("signalReason").textContent="Loading new timeframe…";
+  requestCandleHistory();
+};
+$("analyze").onclick=()=>{analyze();render()};
+$("scan").onclick=()=>{startScanner();renderScanner()};
+$("notify").onclick=async()=>{
+  if(!("Notification" in window)){alert("Browser notifications are not available here.");return}
+  let p=await Notification.requestPermission(); alertReady=p==="granted";
+  $("notify").textContent=alertReady?"ALERTS ON":"ENABLE ALERTS";
+  $("alertState").textContent=alertReady?"ON":"OFF";
+  $("alertState").className="tiny "+(alertReady?"bull":"danger");
+  if(alertReady) $("alertLog").textContent="Alerts enabled. Waiting for a new BUY/SELL setup.";
+};
+$("clear").onclick=()=>{ticks=[];candles=[];digitTicks=[];lastSignal="WAIT";$("price").textContent="—";$("signal").querySelector('.big').textContent="WAITING";$("alertLog").textContent="No new signal alerts.";requestCandleHistory()};
+setInterval(()=>{updateDigitAnalyzer();if(candles.length){render();analyze()}if(scanWs&&scanWs.readyState===WebSocket.OPEN){renderScanner();scannerAlert()}},5000);
+connect();
+</script>
+</body>
+</html>
